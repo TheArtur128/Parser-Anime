@@ -1,22 +1,29 @@
 import requests
-#import urllib.request
 from bs4 import BeautifulSoup
 import os
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
 URL = "https://jut.su"
 #Вводим адрес аниме с Jut.su
-ANIME_URL = input("Enter the URL of the anime from Jut.su\n\> ")
+try:
+    ANIME_URL = input("Enter the URL of the anime from Jut.su\n\> ")
+#Ловим ошибку если ввели несуществующий URL
+except AttributeError:
+    input("You entered the URL incorrectly, please try to enter /anime-name\nEnter anything to exit > ")
+    raise GeneratorExit ("WE DIDN'T FIND THIS ANIME")
+
 #Очистка URL
 if ANIME_URL[:5] == "https":
     ANIME_URL = "/" + ANIME_URL.split("/")[3]
+
+elif ANIME_URL[:6] == "jut.su":
+    ANIME_URL = "/" + ANIME_URL.split("/")[1]
 
 if ANIME_URL[0] != "/":
     ANIME_URL = "/" + ANIME_URL
 
 if ANIME_URL[-4:] == "html":
     ANIME_URL = "/" + ANIME_URL.split("/")[1]
-
 print("")
 #/gintamas - Примерно такое мы должны получить после очистки
 
@@ -59,6 +66,15 @@ video_name = []
 for i in range(len(links_to_page)):
     video_name.append(links_to_page[i][len(URL+ANIME_URL)+1:-5].replace("/", " "))
 
+#Определяем разрешение спарсиных видео. При quick_parsing будет парсить в 480p
+if input("Parse to FullHD ?\ny - yes, every button - no\n\> ").replace(" ", "").lower() in ["y", "yes"]:
+    quick_parsing = False
+    file_name = f"Anime-catalog/{ANIME_NAME}-1080p.txt"
+else:
+    quick_parsing = True
+    file_name = f"Anime-catalog/{ANIME_NAME}-480p.txt"
+print("")
+
 #Получаем ссылки на все видео
 links_to_vidio = []
 for i in range(len(links_to_page)):
@@ -74,57 +90,39 @@ for i in range(len(links_to_page)):
         block = content.find("div", class_="border_around_video")
 
     #Останавливаемся если аниме запрещенно в России или его нет на сайте
-    if i == 0 and block.find("source") is None:
-        input(f"\nSorry, {ANIME_NAME} is not available in Russia :(\nEnter anything to exit > ")
-        raise GeneratorExit ("WE DIDN'T FIND THIS ANIME")
+    if i == 0:
+        if block.find("source") is None:
+            input(f"\nSorry, {ANIME_NAME} is not available in Russia :(\nEnter anything to exit > ")
+            raise GeneratorExit ("WE DIDN'T FIND THIS ANIME")
+            pass
 
-    #Парсим ссылки
-    links_to_vidio.append({video_name[i]: block.find("source").get("src")})
+    #Находим ссылку
+    if not quick_parsing:
+        video_resolution = block.find("source").get("src")
+    elif quick_parsing:
+        video_resolution = block.find("source", res="480").get("src")
+
+    #Запихиваем найденую ссылку в общий тер. лист
+    links_to_vidio.append({video_name[i]: video_resolution})
+
     #Завершение
     if i == len(links_to_page) - 1:
-        print("finished!\n\n\n")
+        print("finished!\n")
 
 #Выводим все ссылки на все серии
 for i in range(len(links_to_vidio)):
-    print(links_to_vidio[i], "\n")
+    print("\n", links_to_vidio[i])
 
 #Создаем католог с аниме
 try:
-    os.mkdir("Anime")
+    os.mkdir("Anime-catalog")
 except FileExistsError: pass
-#Создаем папку под конкретное Аниме
-try:
-    os.mkdir(f"Anime/{ANIME_NAME}")
-except FileExistsError: pass
-
-#Выбираем путь направления деятельности с уже напарсиными данными
-#1. - Текст. файл с ссылками, 2. - Скачиваем видива (Пока не доступно)
-your_way = int(input("\n1. - Copy all links to a text file\n2 - Download all series\n*Enter any key other than the above to exit*\n\> "))
 
 #Добовляем в нашу папку текст. файл со всеми ссылками
-if your_way == 1:
-    with open(f"Anime/{ANIME_NAME}/{ANIME_NAME}.txt", "w") as file:
-        for i in range(len(links_to_vidio)):
-            file.write(f'{links_to_vidio[i]}\n')
-
-#Добовляем видео
-#if your_way == 2:
-#    #Смотрим есть-ли уже скачиный контент
-#    for i in range(len(video_name)):
-#        if os.path.exists(f"Anime/{ANIME_NAME}/{ANIME_NAME}-{video_name[i]}.mp4"):
-#            links_to_vidio.remove(links_to_vidio[i])
-#            video_name.remove(video_name[i])
-#
-#    #Начинаем скачивание
-#    for i in range(len(links_to_vidio)):
-#        com = input(f"\nStart downloading file {ANIME_NAME}-{video_name[i]} ?\ny - yes, n - no\n\> ")
-#        if com == "y" or com == "yes":
-#            print(f"\nDownload {ANIME_NAME}-{video_name[i]}...")
-#            video = requests.get(links_to_vidio[i][video_name[i]], allow_redirects=True)
-#            with open(f"Anime/{ANIME_NAME}/{ANIME_NAME}-{video_name[i]}.mp4", "wb") as file:
-#                file.write(video.content)
-#            print("\nfinished!")
-#        else:
-#            break
+with open(file_name, "w") as file:
+    for i in range(len(links_to_vidio)):
+        file.write(f"{links_to_vidio[i]}\n")
 
 print("\nfinished!")
+
+input("Enter anything to exit > ")
